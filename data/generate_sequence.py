@@ -35,17 +35,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.characters import ScriptVocab  # noqa: E402
 
+FONTS_DIR = PROJECT_ROOT / "data" / "fonts"
+all_fonts = sorted([
+    p for p in FONTS_DIR.glob("*")
+    if p.suffix.lower() in {".ttf", ".otf"}
+])
+
 FONTS_MAP = {
-    "jawa": [
-        PROJECT_ROOT / "data/fonts/NotoSansJavanese-Regular.ttf",
-        PROJECT_ROOT / "data/fonts/NotoSansJavanese-Bold.ttf",
-        PROJECT_ROOT / "data/fonts/nyk Ngayogyan New Italic.ttf",
-        PROJECT_ROOT / "data/fonts/TuladhaJejegOT-Regular.ttf",
-    ],
-    "sunda": [
-        PROJECT_ROOT / "data/fonts/NotoSansSundanese-Regular.ttf",
-        PROJECT_ROOT / "data/fonts/NotoSansSundanese-Bold.ttf",
-    ]
+    "jawa": [p for p in all_fonts if "sunda" not in p.name.lower()],
+    "sunda": [p for p in all_fonts if "sunda" in p.name.lower() or "sundanese" in p.name.lower()]
 }
 
 
