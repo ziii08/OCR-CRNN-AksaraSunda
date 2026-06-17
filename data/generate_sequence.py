@@ -464,12 +464,7 @@ def main() -> None:
     args = parser.parse_args()
 
 
-    if args.script == "sunda":
-        print("==========================================================================")
-        print(" Pipeline stopped after Aksara Jawa training per user request. ")
-        print(" Please test the Javanese model before proceeding to Sundanese training. ")
-        print("==========================================================================")
-        sys.exit(1)
+
 
     vocab = ScriptVocab(args.script)
     output_dir = PROJECT_ROOT / "data" / "dataset" / args.script
