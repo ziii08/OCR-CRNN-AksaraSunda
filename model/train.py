@@ -218,26 +218,47 @@ def main() -> None:
     print("\nConverting inference model to TFLite ...")
     tflite_path = save_dir / "aksara_crnn.tflite"
     
-    # Instantiate clean CPU-only model for TFLite conversion to bypass GPU-specific CudnnRNNV3 ops
-    print("Re-instantiating model on CPU for clean TFLite conversion...")
-    with tf.device('/cpu:0'):
-        training_model_cpu, inference_model_cpu, _ = create_model(
-            num_classes=vocab.num_classes,
-            img_width=IMG_WIDTH,
-            img_height=IMG_HEIGHT
-        )
-        if checkpoint_weights_path.exists():
-            training_model_cpu.load_weights(str(checkpoint_weights_path))
-        
-        converter = tf.lite.TFLiteConverter.from_keras_model(inference_model_cpu)
-        # Enforce pure TFLite built-in operations
+    try:
+        # Try converting directly first (works if CPU-only or no GPU-specific ops initialized)
+        converter = tf.lite.TFLiteConverter.from_keras_model(inference_model)
         converter.target_spec.supported_ops = [
             tf.lite.OpsSet.TFLITE_BUILTINS
         ]
         tflite_model = converter.convert()
+        tflite_path.write_bytes(tflite_model)
+        print(f"TFLite model saved to {tflite_path}  ({len(tflite_model) / 1024:.1f} KB)")
+    except Exception as e:
+        print(f"Direct conversion failed ({e}). Spawning CPU-only subprocess for TFLite conversion...")
+        import os
+        import subprocess
         
-    tflite_path.write_bytes(tflite_model)
-    print(f"TFLite model saved to {tflite_path}  ({len(tflite_model) / 1024:.1f} KB)")
+        conversion_code = f"""
+import sys
+import tensorflow as tf
+from pathlib import Path
+sys.path.insert(0, '{PROJECT_ROOT}')
+from data.characters import ScriptVocab
+from model.architecture import create_model
+
+vocab = ScriptVocab('{args.script}')
+training_model, inference_model, _ = create_model(
+    num_classes=vocab.num_classes,
+    img_width={IMG_WIDTH},
+    img_height={IMG_HEIGHT}
+)
+training_model(tf.zeros((1, {IMG_HEIGHT}, {IMG_WIDTH}, 1)))
+training_model.load_weights('{checkpoint_weights_path}')
+
+converter = tf.lite.TFLiteConverter.from_keras_model(inference_model)
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+tflite_model = converter.convert()
+Path('{tflite_path}').write_bytes(tflite_model)
+print("TFLite conversion in CPU subprocess succeeded!")
+"""
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = ""
+        subprocess.run([sys.executable, "-c", conversion_code], env=env, check=True)
+        print(f"TFLite model saved successfully at {tflite_path}")
     
     # Save vocab mapping JSON for Flutter app
     labels_mapping = {
