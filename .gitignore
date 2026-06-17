@@ -1,0 +1,11 @@
+venv/
+ocr-venv/
+.venv/
+**/__pycache__/
+*.pyc
+data/dataset/
+model/saved/
+tf_cache_*
+training.log
+nohup.out
+*.bak

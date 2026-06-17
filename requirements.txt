@@ -1,0 +1,6 @@
+tensorflow-cpu>=2.15.0
+opencv-python-headless
+pillow
+scipy
+numpy
+matplotlib
