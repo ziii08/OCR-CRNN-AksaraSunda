@@ -27,9 +27,9 @@ echo "==========================================================================
 echo "Cleaning old Sundanese dataset..."
 rm -rf "$PROJECT_DIR/data/dataset/sunda"
 
-# 2. Generate Sundanese dataset (15,000 training, 2,000 validation samples)
+# 2. Generate Sundanese dataset (50,000 training, 3,000 validation samples)
 echo -e "\n[Step 1/3] Generating Sundanese sentence images..."
-$PYTHON "$PROJECT_DIR/data/generate_sequence.py" --script sunda --train-samples 15000 --val-samples 2000
+$PYTHON "$PROJECT_DIR/data/generate_sequence.py" --script sunda --train-samples 50000 --val-samples 3000
 
 # 3. Train Sundanese model
 echo -e "\n[Step 2/3] Training Sundanese CRNN + CTC model..."

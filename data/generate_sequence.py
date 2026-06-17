@@ -269,7 +269,7 @@ def generate_samples(
                 # Hard negative mining: 30% of samples start with ha/ya/la
                 use_hard_negative = random.random() < 0.30
 
-                num_words = random.randint(1, 3)
+                num_words = random.randint(3, 8)
                 for word_idx in range(num_words):
                     word_labels = []
                     if random.random() < 0.1:  # 10% chance to generate digits
@@ -290,6 +290,9 @@ def generate_samples(
                                 word_labels.append(s)
                                 if s == "pangkon":
                                     break
+                    
+                    if len(chosen_labels) + len(word_labels) > 24:
+                        break
                     chosen_labels.extend(word_labels)
                     word_label_counts.append(len(word_labels))
                     word_texts.append("".join([vocab.label_to_char[lbl] for lbl in word_labels]))
@@ -309,7 +312,7 @@ def generate_samples(
                     "rarangken_paten"
                 ]
 
-                num_words = random.randint(1, 3)
+                num_words = random.randint(3, 8)
                 for _ in range(num_words):
                     word_labels = []
                     if random.random() < 0.1:  # 10% chance to generate digits
@@ -329,12 +332,15 @@ def generate_samples(
                                     word_labels.append(r)
                                     if r == "rarangken_paten":
                                         break
+                    
+                    if len(chosen_labels) + len(word_labels) > 24:
+                        break
                     chosen_labels.extend(word_labels)
                     word_label_counts.append(len(word_labels))
                     word_texts.append("".join([vocab.label_to_char[lbl] for lbl in word_labels]))
 
-            # Restrict total label length to 16
-            if len(chosen_labels) <= 16:
+            # Restrict total label length and ensure we have at least 3 words
+            if len(word_texts) >= 3 and len(chosen_labels) <= 24:
                 break
 
         # Join words with space for rendering
