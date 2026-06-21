@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate synthetic sequence (line-level) dataset for Javanese and Sundanese CRNN OCR models.
-Renders random text sequences of 3 to 8 characters into 512x64 images.
+Renders mixed short words and full line text into 512x64 images.
 
 Enhanced augmentation for robustness:
 - Text intensity variation (200-255)
@@ -46,6 +46,9 @@ FONTS_MAP = {
     "sunda": [p for p in all_fonts if "sunda" in p.name.lower() or "sundanese" in p.name.lower()]
 }
 
+CANVAS_W = 512
+CANVAS_H = 64
+MAX_LABEL_LEN = 96
 
 
 def elastic_distortion(image: np.ndarray, alpha: float = 8.0, sigma: float = 3.0) -> np.ndarray:
@@ -254,7 +257,7 @@ def generate_samples(
     print(f"Generating {num_samples} samples for {script} ({split}) using {len(font_paths)} fonts ...")
 
     for i in range(num_samples):
-        # 1. Generate realistic syllable sequences (max length 24)
+        # 1. Generate realistic syllable sequences.
         while True:
             chosen_labels = []
             word_texts = []
@@ -269,7 +272,7 @@ def generate_samples(
                 # Hard negative mining: 30% of samples start with ha/ya/la
                 use_hard_negative = random.random() < 0.30
 
-                num_words = random.randint(3, 8)
+                num_words = random.randint(1, 6)
                 for word_idx in range(num_words):
                     word_labels = []
                     if random.random() < 0.1:  # 10% chance to generate digits
@@ -277,7 +280,7 @@ def generate_samples(
                         for _ in range(num_digits):
                             word_labels.append(random.choice(digits))
                     else:
-                        num_syllables = random.randint(1, 3)
+                        num_syllables = random.randint(1, 4)
                         for syl_idx in range(num_syllables):
                             # Hard negative: first consonant of first word
                             if use_hard_negative and word_idx == 0 and syl_idx == 0:
@@ -291,7 +294,7 @@ def generate_samples(
                                 if s == "pangkon":
                                     break
                     
-                    if len(chosen_labels) + len(word_labels) > 24:
+                    if len(chosen_labels) + len(word_labels) > MAX_LABEL_LEN:
                         break
                     chosen_labels.extend(word_labels)
                     word_label_counts.append(len(word_labels))
@@ -301,18 +304,26 @@ def generate_samples(
                 consonants = [
                     "nga_ka", "nga_qa", "nga_ga", "nga_nga", "nga_ca", "nga_ja", "nga_za", "nga_nya",
                     "nga_ta", "nga_da", "nga_na", "nga_pa", "nga_fa", "nga_va", "nga_ba", "nga_ma",
-                    "nga_ya", "nga_ra", "nga_la", "nga_wa", "nga_sa", "nga_xa", "nga_ha"
+                    "nga_ya", "nga_ra", "nga_la", "nga_wa", "nga_sa", "nga_xa", "nga_ha",
+                    "nga_kha", "nga_sya"
                 ]
                 swara = ["swara_a", "swara_i", "swara_u", "swara_e_accent", "swara_o", "swara_e", "swara_eu"]
                 digits = ["digit_0", "digit_1", "digit_2", "digit_3", "digit_4", "digit_5", "digit_6", "digit_7", "digit_8", "digit_9"]
-                rarangken = [
-                    "rarangken_panghulu", "rarangken_pamepet", "rarangken_panolong", "rarangken_panyuku",
-                    "rarangken_paneleng", "rarangken_paneuleung", "rarangken_panyecek", "rarangken_panglayar",
-                    "rarangken_pangwisad", "rarangken_pamingkal", "rarangken_panyakra", "rarangken_panyiku",
+                vowels = [
+                    "rarangken_panghulu", "rarangken_panyuku", "rarangken_paneleng",
+                    "rarangken_panolong", "rarangken_pamepet", "rarangken_paneuleung"
+                ]
+                medials = [
+                    "rarangken_pamingkal", "rarangken_panyakra", "rarangken_panyiku",
+                    "rarangken_pamintel", "rarangken_papasangan"
+                ]
+                finals = [
+                    "rarangken_panyecek", "rarangken_panglayar", "rarangken_pangwisad",
                     "rarangken_paten"
                 ]
+                punctuation = ["avagraha"]
 
-                num_words = random.randint(3, 8)
+                num_words = random.randint(1, 6)
                 for _ in range(num_words):
                     word_labels = []
                     if random.random() < 0.1:  # 10% chance to generate digits
@@ -320,27 +331,33 @@ def generate_samples(
                         for _ in range(num_digits):
                             word_labels.append(random.choice(digits))
                     else:
-                        num_syllables = random.randint(1, 3)
+                        num_syllables = random.randint(1, 4)
                         for _ in range(num_syllables):
                             if random.random() < 0.2:  # 20% chance of independent vowel
                                 word_labels.append(random.choice(swara))
                             else:
                                 consonant = random.choice(consonants)
                                 word_labels.append(consonant)
-                                if random.random() < 0.6:  # 60% chance to add rarangken
-                                    r = random.choice(rarangken)
-                                    word_labels.append(r)
-                                    if r == "rarangken_paten":
+                                if random.random() < 0.18:
+                                    word_labels.append(random.choice(medials))
+                                if random.random() < 0.55:
+                                    word_labels.append(random.choice(vowels))
+                                if random.random() < 0.25:
+                                    f = random.choice(finals)
+                                    word_labels.append(f)
+                                    if f == "rarangken_paten":
                                         break
+                    if random.random() < 0.04:
+                        word_labels.append(random.choice(punctuation))
                     
-                    if len(chosen_labels) + len(word_labels) > 24:
+                    if len(chosen_labels) + len(word_labels) > MAX_LABEL_LEN:
                         break
                     chosen_labels.extend(word_labels)
                     word_label_counts.append(len(word_labels))
                     word_texts.append("".join([vocab.label_to_char[lbl] for lbl in word_labels]))
 
-            # Restrict total label length and ensure we have at least 3 words
-            if len(word_texts) >= 3 and len(chosen_labels) <= 24:
+            # Restrict total label length so CTC still has enough time steps.
+            if word_texts and len(chosen_labels) <= MAX_LABEL_LEN:
                 break
 
         # Join words with space for rendering
@@ -348,8 +365,8 @@ def generate_samples(
         unicode_chars = [vocab.label_to_char[lbl] for lbl in chosen_labels]
 
         # 2. Draw text using PIL
-        canvas_w = 256
-        canvas_h = 64
+        canvas_w = CANVAS_W
+        canvas_h = CANVAS_H
 
         # --- Background noise: random low-intensity background (0-30 range) ---
         bg_intensity = random.randint(0, 30) if split == "train" else 0
