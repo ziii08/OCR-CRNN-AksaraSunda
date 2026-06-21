@@ -38,24 +38,28 @@ SUNDA_CHARS: dict[str, str] = {
     "\u1B96": "nga_fa", "\u1B97": "nga_va", "\u1B98": "nga_ba", "\u1B99": "nga_ma",
     "\u1B9A": "nga_ya", "\u1B9B": "nga_ra", "\u1B9C": "nga_la", "\u1B9D": "nga_wa",
     "\u1B9E": "nga_sa", "\u1B9F": "nga_xa", "\u1BA0": "nga_ha",
+    "\u1BAE": "nga_kha", "\u1BAF": "nga_sya",
     # Digits
     "\u1BB0": "digit_0", "\u1BB1": "digit_1", "\u1BB2": "digit_2", "\u1BB3": "digit_3",
     "\u1BB4": "digit_4", "\u1BB5": "digit_5", "\u1BB6": "digit_6", "\u1BB7": "digit_7",
     "\u1BB8": "digit_8", "\u1BB9": "digit_9",
     # Rarangken (Vowel/Consonant signs)
     "\u1BA4": "rarangken_panghulu",    # i
-    "\u1BA5": "rarangken_pamepet",     # e
-    "\u1BA8": "rarangken_panolong",    # o
-    "\u1BA1": "rarangken_panyuku",     # u
-    "\u1BA3": "rarangken_paneleng",    # é
-    "\u1BA6": "rarangken_paneuleung",  # eu
+    "\u1BA5": "rarangken_panyuku",     # u
+    "\u1BA6": "rarangken_paneleng",    # é
+    "\u1BA7": "rarangken_panolong",    # o
+    "\u1BA8": "rarangken_pamepet",     # e
+    "\u1BA9": "rarangken_paneuleung",  # eu
     "\u1B80": "rarangken_panyecek",    # ng
     "\u1B81": "rarangken_panglayar",   # r
     "\u1B82": "rarangken_pangwisad",   # h
-    "\u1BAC": "rarangken_pamingkal",   # y
-    "\u1BAD": "rarangken_panyakra",    # r
-    "\u1BAE": "rarangken_panyiku",     # l
-    "\u1BAF": "rarangken_paten",       # killer
+    "\u1BA1": "rarangken_pamingkal",   # y
+    "\u1BA2": "rarangken_panyakra",    # r
+    "\u1BA3": "rarangken_panyiku",     # l
+    "\u1BAC": "rarangken_pamintel",    # m
+    "\u1BAD": "rarangken_papasangan",  # w
+    "\u1BAA": "rarangken_paten",       # killer
+    "\u1BBA": "avagraha",
 }
 
 class ScriptVocab:
