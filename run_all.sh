@@ -27,13 +27,13 @@ echo "==========================================================================
 echo "Cleaning old Sundanese dataset..."
 rm -rf "$PROJECT_DIR/data/dataset/sunda"
 
-# 2. Generate Sundanese dataset (50,000 training, 3,000 validation samples)
+# 2. Generate Sundanese dataset (80,000 training, 5,000 validation samples)
 echo -e "\n[Step 1/3] Generating Sundanese sentence images..."
-$PYTHON "$PROJECT_DIR/data/generate_sequence.py" --script sunda --train-samples 50000 --val-samples 3000
+$PYTHON "$PROJECT_DIR/data/generate_sequence.py" --script sunda --train-samples 80000 --val-samples 5000
 
 # 3. Train Sundanese model
 echo -e "\n[Step 2/3] Training Sundanese CRNN + CTC model..."
-$PYTHON "$PROJECT_DIR/model/train.py" --script sunda --epochs 30 --lr 1e-3
+$PYTHON "$PROJECT_DIR/model/train.py" --script sunda --epochs 45 --lr 5e-4
 
 # 4. Deploy Sundanese model to Flutter assets
 if [ -d "$PROJECT_DIR/../OCR-AksaraTest" ]; then
