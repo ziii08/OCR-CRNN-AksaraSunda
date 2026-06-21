@@ -103,7 +103,7 @@ class OCRModel(keras.Model):
 
 def create_model(
     num_classes: int,
-    img_width: int = 256,
+    img_width: int = 512,
     img_height: int = 64,
 ) -> tuple[keras.Model, keras.Model, keras.Model]:
     """Build and return the training, inference, and base CRNN models.
@@ -167,9 +167,15 @@ def create_model(
     x = layers.ReLU(name="relu6")(x)
     x = layers.MaxPooling2D((2, 1), name="pool6")(x)
 
-    # Reshape to sequence: [batch, 1, 64, 256] -> [batch, 64, 256]
-    x = layers.Permute((2, 1, 3), name="permute")(x)  # [batch, 64, 1, 256]
-    x = layers.Reshape(target_shape=(64, 256), name="reshape")(x)  # [batch, 64, 256]
+    if img_height % 64 != 0 or img_width % 4 != 0:
+        raise ValueError("CRNN expects img_height divisible by 64 and img_width divisible by 4")
+
+    time_steps = img_width // 4
+    feature_dim = (img_height // 64) * 256
+
+    # Reshape CNN features to a left-to-right sequence.
+    x = layers.Permute((2, 1, 3), name="permute")(x)
+    x = layers.Reshape(target_shape=(time_steps, feature_dim), name="reshape")(x)
 
     # Dense projection before RNN (256 units)
     x = layers.Dense(256, name="dense1")(x)
@@ -198,7 +204,7 @@ def create_model(
 
     return training_model, inference_model, base_model
 
-def ctc_decode(predictions, max_length: int = 24) -> list[list[int]]:
+def ctc_decode(predictions, max_length: int = 96) -> list[list[int]]:
     """Greedy decode predictions using TensorFlow's CTC decoder.
 
     Parameters

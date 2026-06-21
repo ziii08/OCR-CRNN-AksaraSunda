@@ -36,7 +36,7 @@ class OcrValidationCallback(keras.callbacks.Callback):
             
             print(f"\n--- Validation predictions after epoch {epoch + 1} ---")
             for i in range(min(5, len(images))):
-                img = tf.expand_dims(images[i], axis=0) # [1, 32, 256, 1]
+                img = tf.expand_dims(images[i], axis=0) # [1, 64, 512, 1]
                 preds = self.inference_model.predict(img, verbose=0)[0]
                 timesteps = preds.shape[0]
                 decoded = []
@@ -60,11 +60,11 @@ class OcrValidationCallback(keras.callbacks.Callback):
 
 
 # Hyperparameters
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 EPOCHS = 45
-IMG_WIDTH = 256
+IMG_WIDTH = 512
 IMG_HEIGHT = 64
-MAX_LABEL_LEN = 24  # Maximum Javanese/Sundanese characters in a single generated sentence
+MAX_LABEL_LEN = 96  # Maximum labels in one line image; CTC has 128 timesteps at 512px width.
 
 def load_dataset_metadata(script_dir: Path) -> tuple[list[dict], list[dict]]:
     metadata_path = script_dir / "metadata.json"
@@ -89,6 +89,10 @@ def make_dataset(
     label_lengths = []
     for s in samples:
         indices = vocab.encode_string(s["labels"])
+        if len(indices) > MAX_LABEL_LEN:
+            raise ValueError(
+                f"Label length {len(indices)} exceeds MAX_LABEL_LEN={MAX_LABEL_LEN}: {s.get('filename')}"
+            )
         label_lengths.append(len(indices))
         # Pad label sequence to MAX_LABEL_LEN with 0 (ignored by CTC since length is specified)
         padded = indices + [0] * (MAX_LABEL_LEN - len(indices))
@@ -103,7 +107,7 @@ def make_dataset(
     def process_image(img_path):
         img_bytes = tf.io.read_file(img_path)
         image = tf.io.decode_png(img_bytes, channels=1)
-        # Resize first as uint8 (much faster)
+        # Generator already emits fixed-size line images; this also normalizes older datasets.
         image = tf.image.resize(image, [IMG_HEIGHT, IMG_WIDTH])
         # Force division by 255.0 to normalize to [0.0, 1.0]
         image = tf.cast(image, tf.float32) / 255.0
@@ -124,7 +128,7 @@ def make_dataset(
     dataset = dataset.map(map_to_model_inputs, num_parallel_calls=tf.data.AUTOTUNE)
     
     # Cache preprocessed dataset to disk so epochs 2+ are super fast
-    cache_file = script_dir / f"tf_cache_{'train' if shuffle else 'val'}"
+    cache_file = script_dir / f"tf_cache_{IMG_WIDTH}x{IMG_HEIGHT}_{'train' if shuffle else 'val'}"
     # Delete old cache files if they exist to avoid conflict
     for p in cache_file.parent.glob(f"{cache_file.name}*"):
         try:
