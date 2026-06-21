@@ -43,7 +43,7 @@ all_fonts = sorted([
 
 FONTS_MAP = {
     "jawa": [p for p in all_fonts if "sunda" not in p.name.lower()],
-    "sunda": [p for p in all_fonts if "sunda" in p.name.lower() or "sundanese" in p.name.lower()]
+    "sunda": all_fonts,
 }
 
 CANVAS_W = 512
