@@ -1,10 +1,10 @@
-# 🚀 Panduan Training Sundanese Sequence OCR di Google Colab (GPU)
+# Panduan Training Sundanese Sequence OCR di Google Colab (GPU)
 
 Panduan ini menjelaskan langkah demi langkah untuk melakukan training model CRNN+CTC Aksara Sunda secara instan di Google Colab memanfaatkan akselerasi GPU (gratis).
 
 ---
 
-## 🛠️ Persiapan Awal
+## Persiapan Awal
 1. Buka [Google Colab](https://colab.research.google.com/).
 2. Buat **Notebook Baru** (New Notebook).
 3. Ubah runtime ke GPU:
@@ -14,7 +14,7 @@ Panduan ini menjelaskan langkah demi langkah untuk melakukan training model CRNN
 
 ---
 
-## 📝 Langkah-Langkah (Salin-Tempel ke Sel Colab)
+## Langkah-Langkah (Salin-Tempel ke Sel Colab)
 
 ### Sel 1: Verifikasi Akses GPU
 Jalankan perintah ini untuk memastikan GPU T4 aktif:
@@ -37,20 +37,20 @@ Kebutuhan pustaka python untuk training:
 ```
 
 ### Sel 4: Buat Dataset Sintetis Sundanese
-Gunakan generator bawaan untuk membuat 15.000 sampel latih dan 2.000 sampel validasi (proses ini memakan waktu kurang dari 2 menit di server Google):
+Gunakan generator bawaan untuk membuat dataset besar. Model sekarang memakai input `512x64`, jadi jumlah sampel perlu cukup untuk variasi rarangken, angka, font regular/bold, panjang baris, dan noise scan:
 ```bash
-!python data/generate_sequence.py --script sunda --train-samples 15000 --val-samples 2000
+!python data/generate_sequence.py --script sunda --train-samples 80000 --val-samples 5000
 ```
 
 ### Sel 5: Mulai Proses Training dengan GPU
-Jalankan skrip training. Karena menggunakan GPU T4, setiap epoch akan selesai dalam waktu kurang dari 1 menit!
+Jalankan skrip training:
 ```bash
-!python model/train.py --script sunda --epochs 30 --lr 1e-3
+!python model/train.py --script sunda --epochs 45 --lr 5e-4
 ```
 
 ---
 
-## 💾 Mengambil Hasil Model
+## Mengambil Hasil Model
 Setelah training selesai, file model TFLite (`aksara_crnn.tflite`) dan file label dictionary (`labels.json`) akan tersimpan di dalam folder `model/saved/sunda/`.
 
 Anda bisa mengunduhnya secara langsung melalui panel berkas di sebelah kiri Colab, atau jalankan perintah ini di sel baru untuk langsung mengunduh berkasnya ke PC Anda:
