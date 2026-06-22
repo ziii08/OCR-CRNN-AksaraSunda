@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -57,6 +58,35 @@ class OcrValidationCallback(keras.callbacks.Callback):
                 predicted_text = self.vocab.decode_to_unicode(decoded)
                 
                 print(f"Sample {i+1} | Expected: {expected_text} | Predicted: {predicted_text} (indices: {decoded})")
+
+
+class ArtifactExportCallback(keras.callbacks.Callback):
+    def __init__(self, save_dir: Path, export_dir: Path | None):
+        super().__init__()
+        self.save_dir = save_dir
+        self.export_dir = export_dir
+
+    def _copy_artifacts(self) -> None:
+        if self.export_dir is None:
+            return
+        self.export_dir.mkdir(parents=True, exist_ok=True)
+        for name in [
+            "latest_checkpoint.weights.h5",
+            "crnn_checkpoint.weights.h5",
+            "training_log.csv",
+            "labels.json",
+            "aksara_crnn.keras",
+            "aksara_crnn.tflite",
+        ]:
+            src = self.save_dir / name
+            if src.exists():
+                shutil.copy2(src, self.export_dir / name)
+
+    def on_epoch_end(self, epoch, logs=None):
+        self._copy_artifacts()
+
+    def on_train_end(self, logs=None):
+        self._copy_artifacts()
 
 
 # Hyperparameters
@@ -150,12 +180,15 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--resume", action="store_true", help="Resume from saved checkpoint weights if available")
+    parser.add_argument("--initial-weights", type=str, default="", help="Checkpoint weights path copied from a previous Kaggle run")
+    parser.add_argument("--export-dir", type=str, default="", help="Directory to copy checkpoints/logs after each epoch")
     parser.add_argument("--clear-cache", action="store_true", help="Rebuild tf.data cache files before training")
     args = parser.parse_args()
     
     script_dir = PROJECT_ROOT / "data" / "dataset" / args.script
     save_dir = PROJECT_ROOT / "model" / "saved" / args.script
     backup_dir = save_dir / "training_backup"
+    export_dir = Path(args.export_dir) if args.export_dir else None
     save_dir.mkdir(parents=True, exist_ok=True)
     
     vocab = ScriptVocab(args.script)
@@ -180,12 +213,20 @@ def main() -> None:
         optimizer=keras.optimizers.Adam(learning_rate=args.lr)
     )
 
-    checkpoint_weights_path = save_dir / "crnn_checkpoint.weights.h5"
-    if args.resume and checkpoint_weights_path.exists():
-        print(f"\nResuming checkpoint weights from {checkpoint_weights_path} ...")
-        training_model.load_weights(str(checkpoint_weights_path))
-    elif checkpoint_weights_path.exists():
-        print(f"\nCheckpoint exists but --resume was not passed: {checkpoint_weights_path}")
+    best_checkpoint_path = save_dir / "crnn_checkpoint.weights.h5"
+    latest_checkpoint_path = save_dir / "latest_checkpoint.weights.h5"
+    initial_weights_path = Path(args.initial_weights) if args.initial_weights else None
+    if initial_weights_path and initial_weights_path.exists():
+        print(f"\nLoading initial weights from {initial_weights_path} ...")
+        training_model.load_weights(str(initial_weights_path))
+    elif args.resume and latest_checkpoint_path.exists():
+        print(f"\nResuming latest checkpoint weights from {latest_checkpoint_path} ...")
+        training_model.load_weights(str(latest_checkpoint_path))
+    elif args.resume and best_checkpoint_path.exists():
+        print(f"\nResuming best checkpoint weights from {best_checkpoint_path} ...")
+        training_model.load_weights(str(best_checkpoint_path))
+    elif best_checkpoint_path.exists():
+        print(f"\nCheckpoint exists but --resume was not passed: {best_checkpoint_path}")
     
     # Callbacks
     callbacks = [
@@ -201,9 +242,15 @@ def main() -> None:
             min_lr=1e-5
         ),
         keras.callbacks.ModelCheckpoint(
-            filepath=str(save_dir / "crnn_checkpoint.weights.h5"),
+            filepath=str(best_checkpoint_path),
             monitor="val_loss",
             save_best_only=True,
+            save_weights_only=True,
+            verbose=1
+        ),
+        keras.callbacks.ModelCheckpoint(
+            filepath=str(latest_checkpoint_path),
+            save_best_only=False,
             save_weights_only=True,
             verbose=1
         ),
@@ -214,7 +261,8 @@ def main() -> None:
             filename=str(save_dir / "training_log.csv"),
             append=args.resume
         ),
-        OcrValidationCallback(inference_model, val_ds, vocab)
+        OcrValidationCallback(inference_model, val_ds, vocab),
+        ArtifactExportCallback(save_dir, export_dir)
     ]
     
     # Train
@@ -227,9 +275,9 @@ def main() -> None:
     )
     
     # Load best weights explicitly if they exist before saving
-    if checkpoint_weights_path.exists():
-        print(f"Loading best checkpoint weights from {checkpoint_weights_path}")
-        training_model.load_weights(str(checkpoint_weights_path))
+    if best_checkpoint_path.exists():
+        print(f"Loading best checkpoint weights from {best_checkpoint_path}")
+        training_model.load_weights(str(best_checkpoint_path))
         
     # Save training weights
     keras_path = save_dir / "aksara_crnn.keras"
@@ -269,7 +317,7 @@ training_model, inference_model, _ = create_model(
     img_height={IMG_HEIGHT}
 )
 training_model(tf.zeros((1, {IMG_HEIGHT}, {IMG_WIDTH}, 1)))
-training_model.load_weights('{checkpoint_weights_path}')
+training_model.load_weights('{best_checkpoint_path}')
 
 converter = tf.lite.TFLiteConverter.from_keras_model(inference_model)
 converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]

@@ -22,12 +22,13 @@ SAVE_DIR="$PROJECT_DIR/model/saved/$SCRIPT"
 KAGGLE_OUTPUT_DIR="/kaggle/working/aksara_sunda_ocr_outputs"
 TRAIN_SAMPLES="${TRAIN_SAMPLES:-80000}"
 VAL_SAMPLES="${VAL_SAMPLES:-5000}"
-EPOCHS="${EPOCHS:-45}"
+EPOCHS="${EPOCHS:-12}"
 LR="${LR:-5e-4}"
 RESUME="${RESUME:-1}"
 CLEAN_DATASET="${CLEAN_DATASET:-0}"
 FORCE_REGENERATE="${FORCE_REGENERATE:-0}"
 CLEAR_CACHE="${CLEAR_CACHE:-0}"
+INITIAL_WEIGHTS="${INITIAL_WEIGHTS:-}"
 
 echo "=========================================================================="
 echo " Starting Sundanese Sequence OCR CRNN + CTC Training Pipeline "
@@ -64,6 +65,13 @@ fi
 if [ "$CLEAR_CACHE" = "1" ]; then
     TRAIN_ARGS+=("--clear-cache")
 fi
+if [ -n "$INITIAL_WEIGHTS" ]; then
+    TRAIN_ARGS+=("--initial-weights" "$INITIAL_WEIGHTS")
+fi
+if [ -d "/kaggle/working" ]; then
+    mkdir -p "$KAGGLE_OUTPUT_DIR"
+    TRAIN_ARGS+=("--export-dir" "$KAGGLE_OUTPUT_DIR")
+fi
 $PYTHON "$PROJECT_DIR/model/train.py" "${TRAIN_ARGS[@]}"
 
 # 4. Deploy Sundanese model to Flutter assets
@@ -87,6 +95,7 @@ if [ -d "/kaggle/working" ]; then
     cp "$SAVE_DIR/aksara_crnn.keras" "$KAGGLE_OUTPUT_DIR/" 2>/dev/null || true
     cp "$SAVE_DIR/labels.json" "$KAGGLE_OUTPUT_DIR/" 2>/dev/null || true
     cp "$SAVE_DIR/crnn_checkpoint.weights.h5" "$KAGGLE_OUTPUT_DIR/" 2>/dev/null || true
+    cp "$SAVE_DIR/latest_checkpoint.weights.h5" "$KAGGLE_OUTPUT_DIR/" 2>/dev/null || true
     cp "$SAVE_DIR/training_log.csv" "$KAGGLE_OUTPUT_DIR/" 2>/dev/null || true
 fi
 
