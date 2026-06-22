@@ -80,7 +80,8 @@ def make_dataset(
     samples: list[dict],
     script_dir: Path,
     vocab: ScriptVocab,
-    shuffle: bool = True
+    shuffle: bool = True,
+    clear_cache: bool = False,
 ) -> tf.data.Dataset:
     # Extract paths and encode labels
     img_paths = [str(script_dir / s["filename"]) for s in samples]
@@ -129,12 +130,12 @@ def make_dataset(
     
     # Cache preprocessed dataset to disk so epochs 2+ are super fast
     cache_file = script_dir / f"tf_cache_{IMG_WIDTH}x{IMG_HEIGHT}_{'train' if shuffle else 'val'}"
-    # Delete old cache files if they exist to avoid conflict
-    for p in cache_file.parent.glob(f"{cache_file.name}*"):
-        try:
-            p.unlink()
-        except OSError:
-            pass
+    if clear_cache:
+        for p in cache_file.parent.glob(f"{cache_file.name}*"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
     dataset = dataset.cache(str(cache_file))
     
     if shuffle:
@@ -147,11 +148,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train sequence CRNN model")
     parser.add_argument("--script", type=str, required=True, choices=["jawa", "sunda"])
     parser.add_argument("--epochs", type=int, default=25)
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--resume", action="store_true", help="Resume from saved checkpoint weights if available")
+    parser.add_argument("--clear-cache", action="store_true", help="Rebuild tf.data cache files before training")
     args = parser.parse_args()
     
     script_dir = PROJECT_ROOT / "data" / "dataset" / args.script
     save_dir = PROJECT_ROOT / "model" / "saved" / args.script
+    backup_dir = save_dir / "training_backup"
     save_dir.mkdir(parents=True, exist_ok=True)
     
     vocab = ScriptVocab(args.script)
@@ -160,8 +164,8 @@ def main() -> None:
     train_samples, val_samples = load_dataset_metadata(script_dir)
     
     # Build data loaders
-    train_ds = make_dataset(train_samples, script_dir, vocab, shuffle=True)
-    val_ds = make_dataset(val_samples, script_dir, vocab, shuffle=False)
+    train_ds = make_dataset(train_samples, script_dir, vocab, shuffle=True, clear_cache=args.clear_cache)
+    val_ds = make_dataset(val_samples, script_dir, vocab, shuffle=False, clear_cache=args.clear_cache)
     
     # Build model
     print("\nBuilding CRNN Model ...")
@@ -175,6 +179,13 @@ def main() -> None:
     training_model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=args.lr)
     )
+
+    checkpoint_weights_path = save_dir / "crnn_checkpoint.weights.h5"
+    if args.resume and checkpoint_weights_path.exists():
+        print(f"\nResuming checkpoint weights from {checkpoint_weights_path} ...")
+        training_model.load_weights(str(checkpoint_weights_path))
+    elif checkpoint_weights_path.exists():
+        print(f"\nCheckpoint exists but --resume was not passed: {checkpoint_weights_path}")
     
     # Callbacks
     callbacks = [
@@ -193,7 +204,15 @@ def main() -> None:
             filepath=str(save_dir / "crnn_checkpoint.weights.h5"),
             monitor="val_loss",
             save_best_only=True,
-            save_weights_only=True
+            save_weights_only=True,
+            verbose=1
+        ),
+        keras.callbacks.BackupAndRestore(
+            backup_dir=str(backup_dir)
+        ),
+        keras.callbacks.CSVLogger(
+            filename=str(save_dir / "training_log.csv"),
+            append=args.resume
         ),
         OcrValidationCallback(inference_model, val_ds, vocab)
     ]
@@ -208,7 +227,6 @@ def main() -> None:
     )
     
     # Load best weights explicitly if they exist before saving
-    checkpoint_weights_path = save_dir / "crnn_checkpoint.weights.h5"
     if checkpoint_weights_path.exists():
         print(f"Loading best checkpoint weights from {checkpoint_weights_path}")
         training_model.load_weights(str(checkpoint_weights_path))
