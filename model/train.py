@@ -212,6 +212,8 @@ def main() -> None:
     training_model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=args.lr)
     )
+    # Subclassed Keras models must be built before BackupAndRestore or load_weights.
+    training_model(tf.zeros((1, IMG_HEIGHT, IMG_WIDTH, 1), dtype=tf.float32))
 
     best_checkpoint_path = save_dir / "crnn_checkpoint.weights.h5"
     latest_checkpoint_path = save_dir / "latest_checkpoint.weights.h5"
