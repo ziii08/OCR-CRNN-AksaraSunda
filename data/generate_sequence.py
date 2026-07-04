@@ -41,9 +41,41 @@ all_fonts = sorted([
     if p.suffix.lower() in {".ttf", ".otf"}
 ])
 
+EXCLUDED_SUNDA_FONT_NAMES = {
+    # These fonts render Sundanese Unicode as tofu boxes/fallback glyphs.
+    "Bahnoo pakuan.otf",
+    "MalayaNgacarakan.ttf",
+    "Ngalagena.ttf",
+    "Sundakelapa.otf",
+    "Sundara-Latin 1.1.ttf",
+}
+
+SUNDA_FONT_UNSUPPORTED_LABELS = {
+    # These fonts are otherwise valid, but miss ᮬ, ᮭ, and ᮺ.
+    "Sun Sarip.ttf": {"rarangken_pamintel", "rarangken_papasangan", "avagraha"},
+    "SundaneseUnicode-2.0 (Kaganga).ttf": {"rarangken_pamintel", "rarangken_papasangan", "avagraha"},
+}
+
+
+def is_valid_sunda_font(path: Path) -> bool:
+    return path.name not in EXCLUDED_SUNDA_FONT_NAMES
+
+
+def compatible_font_paths(script: str, font_paths: list[Path], labels: list[str]) -> list[Path]:
+    if script != "sunda":
+        return font_paths
+
+    label_set = set(labels)
+    compatible = [
+        path for path in font_paths
+        if not (SUNDA_FONT_UNSUPPORTED_LABELS.get(path.name, set()) & label_set)
+    ]
+    return compatible or font_paths
+
+
 FONTS_MAP = {
     "jawa": [p for p in all_fonts if "sunda" not in p.name.lower()],
-    "sunda": all_fonts,
+    "sunda": [p for p in all_fonts if is_valid_sunda_font(p)],
 }
 
 CANVAS_W = 512
@@ -255,6 +287,8 @@ def generate_samples(
     metadata = []
 
     print(f"Generating {num_samples} samples for {script} ({split}) using {len(font_paths)} fonts ...")
+    if script == "sunda" and EXCLUDED_SUNDA_FONT_NAMES:
+        print(f"Excluded {len(EXCLUDED_SUNDA_FONT_NAMES)} invalid Sundanese fonts from dataset generation.")
 
     for i in range(num_samples):
         # 1. Generate realistic syllable sequences.
@@ -374,7 +408,8 @@ def generate_samples(
         draw = ImageDraw.Draw(pil_img)
 
         # Select random font and size (expanded range: 16-40)
-        font_path = random.choice(font_paths)
+        sample_font_paths = compatible_font_paths(script, font_paths, chosen_labels)
+        font_path = random.choice(sample_font_paths)
         font_size = random.randint(16, 40)
         font = ImageFont.truetype(str(font_path), font_size)
 
